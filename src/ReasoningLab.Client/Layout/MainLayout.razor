@@ -1,0 +1,21 @@
+@inherits LayoutComponentBase
+<div class="app-shell">
+    <aside class="sidebar">
+        <a class="brand" href="/" aria-label="ReasoningLab home"><span class="brand-mark">r<span>•</span></span><span>reasoning<span class="brand-light">lab</span><small>A LITTLE MORE CLARITY.</small></span></a>
+        <div class="nav-label">YOUR WORKSPACE</div>
+        <nav aria-label="Main navigation">
+            <NavLink href="/" Match="NavLinkMatch.All"><span aria-hidden="true">◫</span> Overview</NavLink>
+            <NavLink href="/practice/general"><span aria-hidden="true">◇</span> Reasoning practice</NavLink>
+            <NavLink href="/practice/lsat"><span aria-hidden="true">▤</span> LSAT preparation</NavLink>
+            <NavLink href="/practice/ucat"><span aria-hidden="true">⊞</span> UCAT preparation</NavLink>
+            <NavLink href="/skills"><span aria-hidden="true">⌘</span> Skill library</NavLink>
+        </nav>
+        <div class="sidebar-bottom"><div class="small-orbit" aria-hidden="true">✳</div><strong>Good thinking takes practice.</strong><p>Small challenges.<br />Skills that travel with you.</p><a href="/admin">Content studio ↗</a></div>
+    </aside>
+    <div class="workspace">
+        <header class="topbar"><span>Build your thinking toolkit</span><span class="profile"><span class="status-dot"></span> Personal workspace <span class="avatar">You</span></span></header>
+        <main id="main-content">@Body</main>
+        <footer>ReasoningLab · Original learning content. Not affiliated with or endorsed by LSAC or the UCAT Consortium.<br />Prototype profile saved in this browser. Clearing cookies loses access; account recovery is not available yet.</footer>
+    </div>
+</div>
+<div id="blazor-error-ui" role="alert">Something interrupted the app. <a href="" class="reload">Reload</a></div>

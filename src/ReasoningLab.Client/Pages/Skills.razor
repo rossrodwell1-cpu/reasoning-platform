@@ -1,0 +1,7 @@
+@page "/skills"
+@inject LabApi Api
+<PageTitle>Skill library · ReasoningLab</PageTitle>
+<div class="page-heading"><div><span class="eyebrow">A CONNECTED FOUNDATION</span><h1>Your thinking toolkit.</h1><p>One skill model, with room for every new challenge.</p></div></div>
+@if(error is not null){<p class="error">@error</p>}
+@if(catalog is not null){<div class="skill-library">@foreach(var s in catalog.Skills){<article class="panel"><span class="path-icon">◇</span><h2>@s.Name</h2><p class="muted">@(s.Id=="deduction"?"Available in general, LSAT and UCAT introductory practice.":"Planned curriculum · practice content coming in a later increment.")</p>@if(s.Prerequisites.Length>0){<p class="small">Builds on: @string.Join(", ",s.Prerequisites)</p>}@if(s.Id=="deduction"){<a href="/practice/general">Start a challenge →</a>}</article>}</div>}
+@code{Catalog? catalog;string? error;protected override async Task OnInitializedAsync(){try{catalog=await Api.Get<Catalog>("api/catalog");}catch(Exception ex){error=ex.Message;}}}

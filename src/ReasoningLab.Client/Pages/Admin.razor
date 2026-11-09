@@ -1,0 +1,22 @@
+@page "/admin"
+@inject LabApi Api
+<PageTitle>Content studio · ReasoningLab</PageTitle>
+<div class="page-heading"><div><span class="eyebrow">CONTENT STUDIO</span><h1>Give a good question a home.</h1><p>Add an original question or publish a new version. Existing attempts retain their original version.</p></div></div>
+<section class="panel admin-form"><h2>Publish a question version</h2><p class="muted">Requires the server's administrator token. Token access is a prototype measure; role-based administration is planned.</p>
+<form @onsubmit="Save" @onsubmit:preventDefault>
+<label>Administrator token<input type="password" @bind="token" required autocomplete="off" /></label>
+<div class="form-grid"><label>Stable question key<input @bind="key" required maxlength="80" placeholder="general-deduction-008" /></label><label>Pathway<select @bind="pathway"><option value="general">Everyday reasoning</option><option value="lsat">LSAT preparation</option><option value="ucat">UCAT preparation</option></select></label></div>
+<div class="form-grid"><label>Skill<select @bind="skill">@if(catalog is not null){@foreach(var s in catalog.Skills){<option value="@s.Id">@s.Name</option>}}</select></label><label>Difficulty level<input type="number" min="1" max="10000" @bind="difficulty" required /></label></div>
+<label>Question<textarea @bind="prompt" rows="4" required maxlength="10000"></textarea></label>
+<label>Answer options, one per line<textarea @bind="options" rows="4" required></textarea></label>
+<label>Correct option number (starting at 1)<input type="number" min="1" max="8" @bind="answer" required /></label>
+<label>Explanation<textarea @bind="explanation" rows="3" required></textarea></label>
+<label>Misconception feedback<input @bind="misconception" required /></label>
+<button class="button primary" disabled="@busy">@(busy?"Publishing…":"Publish new version")</button>
+</form>@if(message is not null){<p role="status" class="@(failed?"error":"feedback success")">@message</p>}</section>
+@if(catalog is not null){<section class="panel results"><h2>Blueprint register</h2><p>Reference blueprints are not enabled for full mock exams.</p>@foreach(var b in catalog.Blueprints){<div class="blueprint-row"><strong>@b.Id</strong><span>@b.Status</span><span>From @b.EffectiveFrom.ToString("MMM yyyy")</span>@if(b.Source.Length>0){<a href="@b.Source" target="_blank" rel="noopener noreferrer">Official source ↗</a>}</div>}</section>}
+@code{
+    Catalog? catalog;string token="",key="",pathway="general",skill="deduction",prompt="",options="",explanation="",misconception="";int difficulty=1,answer=1;bool busy,failed;string? message;
+    protected override async Task OnInitializedAsync(){try{catalog=await Api.Get<Catalog>("api/catalog");}catch(Exception ex){message=ex.Message;failed=true;}}
+    async Task Save(){busy=true;message=null;try{var result=await Api.Post<System.Text.Json.JsonElement>("api/admin/questions",new NewQuestion(key,pathway,skill,difficulty,prompt,options.Split('\n',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries),answer-1,explanation,misconception),token);message=$"Published version {result.GetProperty("version").GetInt32()}.";failed=false;}catch(Exception ex){message=ex.Message;failed=true;}finally{busy=false;token="";}}
+}

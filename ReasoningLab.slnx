@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ReasoningLab.Client/ReasoningLab.Client.csproj" />
+    <Project Path="src/ReasoningLab.Core/ReasoningLab.Core.csproj" />
+    <Project Path="src/ReasoningLab.Server/ReasoningLab.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ReasoningLab.BrowserTests/ReasoningLab.BrowserTests.csproj" />
+    <Project Path="tests/ReasoningLab.Tests/ReasoningLab.Tests.csproj" />
+  </Folder>
+</Solution>
