@@ -1,0 +1,50 @@
+name: Verify ReasoningLab
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: reasoning
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: reasoninglab
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U reasoning -d reasoninglab"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      ConnectionStrings__ReasoningLab: Host=localhost;Database=reasoninglab;Username=reasoning;Password=test-only-password
+      TEST_POSTGRES: Host=localhost;Database=postgres;Username=reasoning;Password=test-only-password
+      ASPNETCORE_ENVIRONMENT: Development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore
+      - run: dotnet build --no-restore
+      - run: dotnet test tests/ReasoningLab.Tests --no-build --logger trx --results-directory artifacts/test-results
+      - run: pwsh tests/ReasoningLab.BrowserTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
+      - name: Browser acceptance workflow
+        shell: bash
+        run: |
+          dotnet run --project src/ReasoningLab.Server --no-build --no-launch-profile --urls http://localhost:5180 > /tmp/reasoning-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" || true' EXIT
+          for attempt in $(seq 1 60); do
+            curl --fail --silent http://localhost:5180/api/health && break
+            sleep 1
+          done
+          dotnet run --project tests/ReasoningLab.BrowserTests --no-build
+      - run: dotnet publish src/ReasoningLab.Server -c Release --no-restore -o artifacts/publish
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification
+          path: |
+            artifacts/*.png
+            artifacts/test-results

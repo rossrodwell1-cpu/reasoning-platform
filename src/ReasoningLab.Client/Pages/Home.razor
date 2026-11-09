@@ -1,0 +1,35 @@
+@page "/"
+@inject LabApi Api
+<PageTitle>Your workspace · ReasoningLab</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">YOUR THINKING, IN PROGRESS</div><h1>A clearer way to think.</h1><p>Build reasoning skills that go beyond the next question.</p></div><span class="date-chip">One challenge at a time</span></div>
+@if(error is not null){<div class="error" role="alert">@error <button @onclick="Load">Try again</button></div>}
+<section class="hero">
+    <div class="hero-copy"><span class="hero-tag">THE EVERYDAY REASONING PATHWAY</span><h2>Small questions.<br />Bigger possibilities.</h2><p>Spot the connection. Test an assumption. Find your next “aha”. Your practice adapts as your skills grow.</p><a class="button light" href="/practice/general">Find your next challenge <span>↗</span></a><div class="hero-note">Untimed practice · Feedback with every answer</div></div>
+    <div class="thinking-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="art-block block-one">?</div><div class="art-block block-two">→</div><div class="art-block block-three">!</div><span class="spark spark-one">✳</span><span class="spark spark-two">+</span><span class="art-caption">CONNECT THE DOTS</span></div>
+</section>
+<div class="section-heading"><h2>Your learning snapshot</h2><span class="muted">Progress follows you across pathways</span></div>
+<div class="stats-grid">
+    <article class="stat-card"><span class="stat-symbol purple">◇</span><div><span>Practice attempts</span><strong>@(data?.Skills.Sum(s => s.Attempts) ?? 0)</strong><small>Evidence behind your progress</small></div></article>
+    <article class="stat-card"><span class="stat-symbol green">↗</span><div><span>Current deduction level</span><strong>@(data?.Skills.FirstOrDefault()?.Level ?? 1)<em> / open-ended</em></strong><small>Three distinct successes to advance</small></div></article>
+    <article class="stat-card"><span class="stat-symbol orange">◷</span><div><span>Reviews due</span><strong>@(data?.Skills.Count(s => s.ReviewDue <= DateTimeOffset.UtcNow) ?? 0)</strong><small>Keep your reasoning fresh</small></div></article>
+</div>
+<div class="dashboard-grid">
+    <section class="panel"><div class="section-heading"><h2>Your shared skills</h2><a href="/skills">Explore library ↗</a></div>
+        @if(data?.Skills.Length > 0){foreach(var s in data.Skills){<SkillMeter Name="@s.Name" Level="s.Level" Correct="s.Correct" Attempts="s.Attempts" />}}
+        else{<SkillMeter /><p class="muted">Your first answer starts your skill profile. General and exam practice contribute to the same skills.</p>}
+        <div class="insight"><span>✦</span><div><strong>A useful next step</strong><p>@(data?.Recommendations.FirstOrDefault() ?? "Begin with an everyday reasoning challenge.")</p></div></div>
+    </section>
+    <section class="panel next-panel"><span class="eyebrow">HOW PROGRESS WORKS</span><h2>Learn it here.<br />Use it everywhere.</h2><p>A deduction is still a deduction, whether you're planning your day or evaluating an argument.</p><div class="path-pills"><span>General</span><span>↔</span><span>LSAT</span><span>↔</span><span>UCAT</span></div><p class="small muted">Skill levels describe practice progress. They are not predicted examination scores.</p></section>
+</div>
+<div class="section-heading"><h2>Take your skills further</h2><span class="muted">Same foundations. A different focus.</span></div>
+<div class="pathway-grid">
+    <article class="pathway-card"><span class="path-icon">▤</span><span class="eyebrow">LAW SCHOOL PREPARATION</span><h3>Think through the argument.</h3><p>Explore LSAT-style logical reasoning with original introductory questions.</p><a href="/practice/lsat">Explore LSAT preparation <span>→</span></a></article>
+    <article class="pathway-card mint"><span class="path-icon">⊞</span><span class="eyebrow">MEDICAL SCHOOL PREPARATION</span><h3>Make the evidence count.</h3><p>Practise drawing valid conclusions through UCAT-style syllogisms.</p><a href="/practice/ucat">Explore UCAT preparation <span>→</span></a></article>
+</div>
+@if(data?.Results.Length > 0){<section class="panel results"><h2>Your diagnostic results</h2>@foreach(var r in data.Results){<div class="result-row"><div><strong>@r.Pathway.ToUpperInvariant() · short diagnostic</strong><p class="muted">@r.Completed.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</p></div><strong>@r.Correct / @r.Total</strong></div>}<p class="small muted">Raw correctness on original questions. Not an official exam score.</p></section>}
+@if(data?.Misconceptions.Length > 0){<section class="panel results"><h2>Patterns to revisit</h2>@foreach(var m in data.Misconceptions){<p>@m</p>}</section>}
+@code {
+    private Dashboard? data; private string? error;
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load(){try{error=null;await Api.Initialize();data=await Api.Get<Dashboard>("api/dashboard");}catch(Exception ex){error=ex.Message;}}
+}

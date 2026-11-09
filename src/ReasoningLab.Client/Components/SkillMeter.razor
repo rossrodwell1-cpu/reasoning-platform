@@ -1,0 +1,12 @@
+<div class="skill-meter">
+    <div class="row"><strong>@Name</strong><span class="pill">Level @Level</span></div>
+    <div class="meter" role="meter" aria-label="Practice accuracy" aria-valuenow="@Percent" aria-valuemin="0" aria-valuemax="100"><span style="width: @(Percent)%"></span></div>
+    <div class="row muted"><span>@Correct correct · @Attempts attempts</span><span>@Percent% practice accuracy</span></div>
+</div>
+@code {
+    [Parameter] public string Name { get; set; } = "Deductive reasoning";
+    [Parameter] public int Level { get; set; } = 1;
+    [Parameter] public int Correct { get; set; }
+    [Parameter] public int Attempts { get; set; }
+    private int Percent => Attempts == 0 ? 0 : (int)Math.Round(Correct * 100d / Attempts);
+}

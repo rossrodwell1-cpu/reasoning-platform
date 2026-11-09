@@ -1,0 +1,36 @@
+<section class="question-panel" aria-labelledby="question-title">
+    <div class="row"><span class="eyebrow">@Question.Skill</span><span class="pill">@(Question.IsReview ? "Spaced review" : $"Level {Question.Difficulty}")</span></div>
+    <h2 id="question-title">@Question.Prompt</h2>
+    <fieldset disabled="@(Busy || Feedback is not null)">
+        <legend class="muted">Choose the conclusion supported by the information.</legend>
+        @for (var i = 0; i < Question.Options.Length; i++)
+        {
+            var option = i;
+            <label class="answer-option @(Selected == i ? "selected" : "") @(Feedback is not null && Feedback.CorrectChoice == i ? "correct-option" : "")">
+                <input type="radio" name="answer" value="@i" checked="@(Selected == i)" @onchange="() => Selected = option" />
+                <span class="option-letter">@((char)('A'+i))</span><span>@Question.Options[i]</span>
+            </label>
+        }
+    </fieldset>
+    @if (Feedback is not null)
+    {
+        <div class="feedback @(Feedback.Correct ? "success" : "review")" role="status"><strong>@(Feedback.Correct ? "That's sound reasoning." : "Let's follow the logic.")</strong><p>@Feedback.Explanation</p>@if(Feedback.LevelUp){<p><strong>A step forward — you've unlocked the next level.</strong></p>}</div>
+        <button class="button primary" @onclick="OnContinue">Continue <span aria-hidden="true">→</span></button>
+    }
+    else
+    {
+        <div class="question-action"><span class="muted">@(IsDiagnostic ? "Feedback arrives when the diagnostic ends." : "Take your time. The reasoning matters.")</span><button class="button primary" disabled="@(Selected is null || Busy)" @onclick="Submit">@(Busy ? "Saving…" : "Check answer") <span aria-hidden="true">→</span></button></div>
+    }
+</section>
+@code {
+    [Parameter, EditorRequired] public QuestionCard Question { get; set; } = null!;
+    [Parameter] public Feedback? Feedback { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool IsDiagnostic { get; set; }
+    [Parameter] public EventCallback<int> OnAnswer { get; set; }
+    [Parameter] public EventCallback OnContinue { get; set; }
+    private int? Selected;
+    private Guid previous;
+    protected override void OnParametersSet() { if (previous != Question.Id) { previous = Question.Id; Selected = null; } }
+    private async Task Submit() { if (Selected is int choice) await OnAnswer.InvokeAsync(choice); }
+}
