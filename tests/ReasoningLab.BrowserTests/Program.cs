@@ -10,6 +10,16 @@ await using var browser = await playwright.Chromium.LaunchAsync(new()
     ExecutablePath = Environment.GetEnvironmentVariable("BROWSER_EXECUTABLE")
 });
 Directory.CreateDirectory("artifacts");
+if (args.Contains("--timeout-only"))
+{
+    await RecoveryChecks.TimeoutRecovery(browser, url);
+    return;
+}
+if (args.Contains("--recovery-only"))
+{
+    await RecoveryChecks.Run(browser, url);
+    return;
+}
 if (args.Contains("--pwa-only"))
 {
     await PwaChecks.Run(browser, url);
@@ -61,5 +71,7 @@ foreach (var (name, width, height) in new[] { ("desktop", 1440, 1100), ("tablet"
 }
 }
 
+if (args.Contains("--workflow-only")) return;
 await ThemeChecks.Run(browser, url);
 await PwaChecks.Run(browser, url);
+await RecoveryChecks.Run(browser, url);

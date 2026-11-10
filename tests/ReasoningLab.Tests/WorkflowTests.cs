@@ -123,6 +123,33 @@ public class WorkflowTests(PostgresFixture fixture) : IClassFixture<PostgresFixt
         Assert.Equal(1, Assert.Single((await c.GetFromJsonAsync<Dashboard>("/api/dashboard"))!.Results).Correct);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Uncertain_diagnostic_retry_after_expiry_preserves_only_committed_answers(bool committedBeforeDisconnect)
+    {
+        using var client = await Learner();
+        var original = await Start(client, "lsat", "diagnostic");
+        var answer = new SubmitAnswer(original.Question!.Id, await fixture.CorrectAnswer(original.Question.Id));
+        if (committedBeforeDisconnect)
+        {
+            // The server commits, but the client never consumes the acknowledgement.
+            using var discarded = await client.PostAsJsonAsync($"/api/sessions/{original.Id}/answers", answer);
+            discarded.EnsureSuccessStatusCode();
+        }
+        fixture.Clock.Now = original.Deadline!.Value.AddSeconds(1);
+        for (var retry = 0; retry < 2; retry++)
+        {
+            var result = await Read(await client.PostAsJsonAsync($"/api/sessions/{original.Id}/answers", answer));
+            Assert.True(result.Completed);
+            Assert.Equal(original.Deadline, result.Deadline);
+            Assert.Equal(committedBeforeDisconnect ? 1 : 0, result.Answered);
+            Assert.Equal(committedBeforeDisconnect ? 1 : 0, result.Result!.Correct);
+            Assert.Null(result.Feedback);
+        }
+        Assert.Single((await client.GetFromJsonAsync<Dashboard>("/api/dashboard"))!.Results);
+    }
+
     [Fact]
     public async Task Fixed_form_is_independent_of_mastery_and_exam_dates_select_versions()
     {

@@ -3,49 +3,226 @@
 @inject LabApi Api
 <PageTitle>Practice · ReasoningLab</PageTitle>
 <div class="page-heading"><div><div class="eyebrow">YOUR NEXT CONNECTION</div><h1>@Title</h1><p>Your shared reasoning skills travel with you.</p></div><a class="text-link" href="/">View progress ↗</a></div>
-@if(error is not null){<div class="error" role="alert">@error <button @onclick="Reload">Try again</button></div>}
+@if (error is not null)
+{
+    <div class="error" role="alert" data-testid="session-error">
+        <p>@error</p>
+        <button disabled="@busy" @onclick="Recover">@RecoveryLabel</button>
+    </div>
+}
+@if (notice is not null) { <p role="status">@notice</p> }
+@if (progressError is not null)
+{
+    <div class="error" role="status" data-testid="progress-error">
+        <p>@progressError</p>
+        <button disabled="@(busy || refreshingProgress)" @onclick="RetryProgress">Refresh progress</button>
+    </div>
+}
 @if(session is null){<section class="panel"><p>Finding your next challenge…</p></section>}
 else
 {
     <div class="practice-layout"><div>
         <div class="session-bar"><span><span class="status-dot"></span> @(session.Mode == "practice" ? "Adaptive practice" : "Fixed short diagnostic")</span><span>@session.Answered answered @if(session.Total is not null){<span> / @session.Total</span>}</span>@if(session.Deadline is not null && !session.Completed){<strong aria-label="Time remaining">@TimeRemaining</strong>}</div>
         @if(displayQuestion is not null && (!session.Completed || feedback is not null))
-        {<QuestionPanel Question="displayQuestion" Feedback="feedback" Busy="busy" IsDiagnostic="@(session.Mode == "diagnostic")" OnAnswer="Answer" OnContinue="Continue" />}
+        {<QuestionPanel Question="displayQuestion" Feedback="feedback" Busy="busy" Locked="@(pending is not null || DeadlineElapsed)" LockMessage="@(pending is not null ? "Your selected answer is retained. Use the recovery action above before answering again." : "Time has elapsed. Checking the server-confirmed result does not extend the deadline.")" IsDiagnostic="@(session.Mode == "diagnostic")" OnAnswer="Answer" OnContinue="Continue" />}
         else if(session.Completed){<section class="panel completion"><span class="completion-mark">✓</span><h2>A moment to reflect.</h2><p>You answered @session.Result!.Correct of @session.Result.Total questions correctly.</p><p class="muted">@session.Result.Label</p><a class="button primary" href="/">See your progress →</a><button class="button secondary" @onclick="() => Start(false)">Back to practice</button></section>}
         else if(session.Exhausted){<section class="panel completion"><span class="completion-mark">✦</span><h2>You've explored this starter bank.</h2><p>Your progress is saved. Come back when review is due, or try another pathway.</p><a class="button primary" href="/">Explore your progress →</a></section>}
     </div><aside class="practice-aside"><section class="panel"><span class="eyebrow">THE SKILL BEHIND IT</span><h3>Deductive reasoning</h3><p>Work from what you know. Separate what must be true from what could be true.</p>@if(skill is not null){<SkillMeter Level="skill.Level" Correct="skill.Correct" Attempts="skill.Attempts" />}<p class="small muted">Your level is shared across general, LSAT and UCAT practice.</p></section>
-        @if(Pathway == "lsat" && session.Mode == "practice"){<section class="panel diagnostic-card"><span class="eyebrow">TRY A DIFFERENT PACE</span><h3>Three minutes.<br />One fixed challenge.</h3><p>3 original questions. A fixed order. Feedback after you finish. No tools.</p><button class="button secondary" disabled="@busy" @onclick="() => Start(true)">Start short diagnostic →</button><p class="small muted">This introductory diagnostic is not a full LSAT mock.</p></section>}
+        @if(Pathway == "lsat" && session.Mode == "practice"){<section class="panel diagnostic-card"><span class="eyebrow">TRY A DIFFERENT PACE</span><h3>Three minutes.<br />One fixed challenge.</h3><p>3 original questions. A fixed order. Feedback after you finish. No tools.</p><button class="button secondary" disabled="@(busy || pending is not null)" @onclick="() => Start(true)">Start short diagnostic →</button><p class="small muted">This introductory diagnostic is not a full LSAT mock.</p></section>}
         @if(session.Mode == "practice"){<p class="small muted">Original introductory content. Full exam simulations are not yet available.</p>}
     </aside></div>
 }
 @code {
     [Parameter] public string Pathway { get; set; } = "general";
-    private SessionView? session; private QuestionCard? displayQuestion; private Feedback? feedback;
-    private SkillProgress? skill; private bool busy; private string? error; private Timer? timer;
-    private TimeSpan offset; private bool disposed; private bool polling;
+    private SessionView? session;
+    private QuestionCard? displayQuestion;
+    private Feedback? feedback;
+    private SkillProgress? skill;
+    private bool busy, refreshingProgress, disposed, deadlineChecked, startFailed, requestedDiagnostic, answerRejected;
+    private string? error, progressError, notice;
+    private Timer? timer;
+    private TimeSpan offset;
+    private int generation, progressVersion;
+
+    // One in-memory in-flight operation, not an offline queue. Never substitute
+    // the next question or a changed choice when retrying an uncertain write.
+    private sealed record PendingAnswer(Guid SessionId, SubmitAnswer Answer);
+    private PendingAnswer? pending;
+    private bool DeadlineElapsed => session?.Deadline is { } deadline && deadline <= DateTimeOffset.UtcNow + offset;
     private string Title => Pathway switch { "lsat" => "LSAT preparation", "ucat" => "UCAT preparation", _ => "Everyday reasoning" };
-    private string TimeRemaining => TimeSpan.FromSeconds(Math.Max(0,(session!.Deadline!.Value-(DateTimeOffset.UtcNow+offset)).TotalSeconds)).ToString(@"mm\:ss");
-    protected override async Task OnParametersSetAsync(){timer?.Dispose();session=null;await Start(false);}
+    private string TimeRemaining => TimeSpan.FromSeconds(Math.Max(0, (session!.Deadline!.Value - (DateTimeOffset.UtcNow + offset)).TotalSeconds)).ToString(@"mm\:ss");
+    private string RecoveryLabel => pending is not null && !answerRejected ? "Retry same answer" : startFailed ? "Try again" : "Refresh session";
+    private bool IsCurrent(int version) => !disposed && version == generation;
+    private static string FailureMessage(Exception ex) => ex is ApiFailure ? ex.Message : "Something interrupted the request. Please try again.";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        generation++;
+        timer?.Dispose();
+        session = null;
+        displayQuestion = null;
+        feedback = null;
+        skill = null;
+        pending = null;
+        error = progressError = notice = null;
+        busy = refreshingProgress = startFailed = answerRejected = deadlineChecked = false;
+        await Start(false);
+    }
+
     private async Task Start(bool diagnostic)
     {
-        if(busy) return;busy=true;error=null;
-        try{await Api.Initialize();session=await Api.Post<SessionView>("api/sessions",new StartSession(Pathway,diagnostic?"diagnostic":"practice"));Show();await RefreshSkill();timer?.Dispose();timer=new Timer(async _ => await Tick(),null,1000,1000);}
-        catch(Exception ex){error=ex.Message;}finally{busy=false;}
+        if (busy || pending is not null) return;
+        var version = generation;
+        busy = true;
+        error = notice = null;
+        requestedDiagnostic = diagnostic;
+        startFailed = false;
+        try
+        {
+            await Api.Initialize();
+            if (!IsCurrent(version)) return;
+            var result = await Api.Post<SessionView>("api/sessions", new StartSession(Pathway, diagnostic ? "diagnostic" : "practice"));
+            if (!IsCurrent(version)) return;
+            session = result;
+            Show();
+            deadlineChecked = false;
+            timer?.Dispose();
+            timer = new Timer(async _ => await Tick(), null, 1000, 1000);
+            await RefreshSkill(version, false);
+        }
+        catch (Exception ex)
+        {
+            if (IsCurrent(version)) { error = FailureMessage(ex); startFailed = true; }
+        }
+        finally { if (IsCurrent(version)) busy = false; }
     }
-    private void Show(){displayQuestion=session?.Question;feedback=null;if(session is not null)offset=session.ServerNow-DateTimeOffset.UtcNow;}
-    private async Task RefreshSkill(){var dashboard=await Api.Get<Dashboard>("api/dashboard");skill=dashboard.Skills.FirstOrDefault();}
+
+    private void Show()
+    {
+        displayQuestion = session?.Question;
+        feedback = null;
+        if (session is not null) offset = session.ServerNow - DateTimeOffset.UtcNow;
+    }
+
+    private async Task RefreshSkill(int version, bool answerConfirmed)
+    {
+        if (!IsCurrent(version)) return;
+        var request = ++progressVersion;
+        refreshingProgress = true;
+        try
+        {
+            var dashboard = await Api.Get<Dashboard>("api/dashboard");
+            if (!IsCurrent(version) || request != progressVersion) return;
+            skill = dashboard.Skills.FirstOrDefault();
+            progressError = null;
+        }
+        catch (Exception ex)
+        {
+            if (IsCurrent(version) && request == progressVersion)
+                progressError = (answerConfirmed ? "Your answer was saved, but your progress summary couldn't be refreshed. " : "Your progress summary couldn't be refreshed. ") + FailureMessage(ex);
+        }
+        finally { if (IsCurrent(version) && request == progressVersion) refreshingProgress = false; }
+    }
+
+    private async Task RetryProgress()
+    {
+        if (!busy && !refreshingProgress) await RefreshSkill(generation, false);
+    }
+
     private async Task Answer(int choice)
     {
-        if(busy || displayQuestion is null)return;busy=true;error=null;
-        try{session=await Api.Post<SessionView>($"api/sessions/{session!.Id}/answers",new SubmitAnswer(displayQuestion.Id,choice));feedback=session.Feedback;if(feedback is null)Show();await RefreshSkill();}
-        catch(Exception ex){error=ex.Message;}finally{busy=false;}
+        if (busy || pending is not null || displayQuestion is null || session is null || DeadlineElapsed) return;
+        pending = new(session.Id, new SubmitAnswer(displayQuestion.Id, choice));
+        await SendPendingAnswer();
     }
-    private void Continue()=>Show();
-    private async Task Reload(){if(session is null){await Start(false);return;}try{error=null;session=await Api.Get<SessionView>($"api/sessions/{session.Id}");Show();}catch(Exception ex){error=ex.Message;}}
+
+    private async Task SendPendingAnswer()
+    {
+        if (busy || pending is null) return;
+        var version = generation;
+        var submission = pending;
+        busy = true;
+        error = notice = progressError = null;
+        answerRejected = false;
+        try
+        {
+            var result = await Api.Post<SessionView>($"api/sessions/{submission.SessionId}/answers", submission.Answer);
+            if (!IsCurrent(version)) return;
+            session = result;
+            pending = null;
+            feedback = result.Feedback;
+            offset = result.ServerNow - DateTimeOffset.UtcNow;
+            if (feedback is null) Show();
+            // An expired diagnostic returns its final view, not an acknowledgement
+            // of this individual answer. Never infer that a late answer was saved.
+            if (result.Mode == "diagnostic" && result.Completed)
+                notice = "The diagnostic has ended. The result below is confirmed by the server; retries do not extend its deadline.";
+            await RefreshSkill(version, result.Feedback is not null || (result.Mode == "diagnostic" && !result.Completed));
+        }
+        catch (Exception ex)
+        {
+            if (!IsCurrent(version)) return;
+            answerRejected = ex is ApiFailure { Kind: ApiFailureKind.Rejected };
+            error = answerRejected
+                ? "The server rejected this submission. " + FailureMessage(ex) + " Refresh the session to check its recorded state."
+                : "We couldn't confirm whether your answer was saved. " + FailureMessage(ex) + " Your selection is retained on this page. Retry the same answer to confirm its status.";
+        }
+        finally { if (IsCurrent(version)) busy = false; }
+    }
+
+    private async Task Recover()
+    {
+        if (busy) return;
+        if (pending is not null && !answerRejected) await SendPendingAnswer();
+        else if (startFailed || session is null) await Start(requestedDiagnostic);
+        else await Reload();
+    }
+
+    private void Continue()
+    {
+        if (!busy && pending is null) { notice = null; Show(); }
+    }
+
+    private async Task Reload()
+    {
+        if (busy || session is null) return;
+        var version = generation;
+        var id = session.Id;
+        busy = true;
+        error = null;
+        try
+        {
+            var result = await Api.Get<SessionView>($"api/sessions/{id}");
+            if (!IsCurrent(version)) return;
+            session = result;
+            pending = null;
+            answerRejected = false;
+            // If the device clock was ahead, the server may still report an
+            // active diagnostic. Re-arm expiry checking using its corrected time.
+            deadlineChecked = result.Completed;
+            Show();
+            notice = result.Completed ? "The diagnostic has ended. The result below is confirmed by the server." : "Session status refreshed. Only answers recorded by the server count.";
+        }
+        catch (Exception ex) { if (IsCurrent(version)) error = FailureMessage(ex); }
+        finally { if (IsCurrent(version)) busy = false; }
+    }
+
     private async Task Tick()
     {
-        if(disposed || polling)return;
-        await InvokeAsync(async()=>{if(disposed)return;polling=true;try{if(!busy && session?.Deadline is not null && !session.Completed && session.Deadline <= DateTimeOffset.UtcNow+offset)await Reload();StateHasChanged();}finally{polling=false;}});
+        if (disposed) return;
+        await InvokeAsync(async () =>
+        {
+            if (disposed) return;
+            // Check expiry once. A failed read offers manual recovery instead of
+            // polling every second; an uncertain answer is never auto-resubmitted.
+            if (!busy && pending is null && !deadlineChecked && session is { Completed: false } && DeadlineElapsed)
+            {
+                deadlineChecked = true;
+                await Reload();
+            }
+            StateHasChanged();
+        });
     }
-    public void Dispose(){disposed=true;timer?.Dispose();}
+
+    public void Dispose() { disposed = true; generation++; timer?.Dispose(); }
 }
