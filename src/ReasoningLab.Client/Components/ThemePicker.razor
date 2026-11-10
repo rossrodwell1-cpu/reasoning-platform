@@ -1,0 +1,28 @@
+@inject IJSRuntime JS
+
+<div class="theme-picker">
+    <label for="theme-preference">Theme</label>
+    <select id="theme-preference" value="@preference" @onchange="ChangeTheme">
+        <option value="system">Use system setting</option>
+        <option value="light">Crisp Light</option>
+        <option value="dark">Dark</option>
+        <option value="warm">Warm Study</option>
+    </select>
+</div>
+
+@code {
+    private string preference = "system";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        preference = await JS.InvokeAsync<string>("reasoningTheme.get");
+        StateHasChanged();
+    }
+
+    private async Task ChangeTheme(ChangeEventArgs args)
+    {
+        preference = args.Value?.ToString() ?? "system";
+        await JS.InvokeVoidAsync("reasoningTheme.set", preference);
+    }
+}

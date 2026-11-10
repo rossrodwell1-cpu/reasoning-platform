@@ -8,7 +8,16 @@
             var option = i;
             <label class="answer-option @(Selected == i ? "selected" : "") @(Feedback is not null && Feedback.CorrectChoice == i ? "correct-option" : "")">
                 <input type="radio" name="answer" value="@i" checked="@(Selected == i)" @onchange="() => Selected = option" />
-                <span class="option-letter">@((char)('A'+i))</span><span>@Question.Options[i]</span>
+                <span class="option-letter">@((char)('A'+i))</span><span>@Question.Options[i]
+                    @if (Feedback is not null && Feedback.CorrectChoice == i)
+                    {
+                        <span class="answer-tag">✓ @(Selected == i ? "Your answer · correct" : "Correct answer")</span>
+                    }
+                    else if (Feedback is not null && Selected == i)
+                    {
+                        <span class="answer-tag">Your answer · not supported</span>
+                    }
+                </span>
             </label>
         }
     </fieldset>
