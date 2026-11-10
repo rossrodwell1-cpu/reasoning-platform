@@ -1501,3 +1501,24 @@ fieldset:disabled .answer-option { cursor:default; }
   .answer-option input { appearance:auto; background:revert; border:revert; }
   nav a.active,.selected { outline:2px solid Highlight; }
 }
+
+/* Root-hosted browser and standalone layouts share the same safe-area bounds.
+   Insets are normally zero; no orientation lock or zoom restrictions are used. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+body {
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+.sidebar { top:var(--safe-top); left:var(--safe-left); bottom:var(--safe-bottom); }
+.skip-link { left:calc(10px + var(--safe-left)); }
+.skip-link:focus { top:calc(10px + var(--safe-top)); }
+#blazor-error-ui {
+  left:var(--safe-left);
+  right:var(--safe-right);
+  bottom:var(--safe-bottom);
+  width:auto;
+}

@@ -1,0 +1,7 @@
+<!-- Existing ReasoningLab favicon mark, with an opaque square background for
+     OS-controlled icon masking. The mark fits within the central 80% circle. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#6465a5"/>
+  <path d="M20 45V23h9v5c3-5 8-6 13-4v9c-8-3-13 0-13 8v4z" fill="white"/>
+  <circle cx="46" cy="28" r="5" fill="#d7d6ef"/>
+</svg>

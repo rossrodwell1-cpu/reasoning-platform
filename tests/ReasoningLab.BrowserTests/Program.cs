@@ -10,6 +10,11 @@ await using var browser = await playwright.Chromium.LaunchAsync(new()
     ExecutablePath = Environment.GetEnvironmentVariable("BROWSER_EXECUTABLE")
 });
 Directory.CreateDirectory("artifacts");
+if (args.Contains("--pwa-only"))
+{
+    await PwaChecks.Run(browser, url);
+    return;
+}
 if (!args.Contains("--themes-only"))
 {
 foreach (var (name, width, height) in new[] { ("desktop", 1440, 1100), ("tablet", 820, 1180), ("mobile", 390, 844) })
@@ -57,3 +62,4 @@ foreach (var (name, width, height) in new[] { ("desktop", 1440, 1100), ("tablet"
 }
 
 await ThemeChecks.Run(browser, url);
+await PwaChecks.Run(browser, url);
