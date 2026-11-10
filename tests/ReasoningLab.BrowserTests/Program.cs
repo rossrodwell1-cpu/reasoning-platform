@@ -10,6 +10,8 @@ await using var browser = await playwright.Chromium.LaunchAsync(new()
     ExecutablePath = Environment.GetEnvironmentVariable("BROWSER_EXECUTABLE")
 });
 Directory.CreateDirectory("artifacts");
+if (!args.Contains("--themes-only"))
+{
 foreach (var (name, width, height) in new[] { ("desktop", 1440, 1100), ("tablet", 820, 1180), ("mobile", 390, 844) })
 {
     await using var context = await browser.NewContextAsync(new() { ViewportSize = new() { Width = width, Height = height } });
@@ -32,6 +34,7 @@ foreach (var (name, width, height) in new[] { ("desktop", 1440, 1100), ("tablet"
     await page.ScreenshotAsync(new() { Path = $"artifacts/{name}-practice.png", FullPage = true });
     await page.ReloadAsync();
     await Expect(page.GetByText("Every parcel marked urgent", new() { Exact = false })).ToBeVisibleAsync();
+    if (width <= 760) await page.GetByRole(AriaRole.Button, new() { Name = "Menu", Exact = true }).ClickAsync();
     await page.GetByRole(AriaRole.Link, new() { Name = "LSAT preparation", Exact = false }).First.ClickAsync();
     await Expect(page.GetByText("Every funded project", new() { Exact = false })).ToBeVisibleAsync();
     await page.GetByRole(AriaRole.Button, new() { Name = "Start short diagnostic" }).ClickAsync();
@@ -51,3 +54,6 @@ foreach (var (name, width, height) in new[] { ("desktop", 1440, 1100), ("tablet"
     if (errors.Count > 0) throw new Exception(string.Join(Environment.NewLine, errors));
     Console.WriteLine($"PASS {name}: practice, promotion, refresh persistence, exam switch, diagnostic and dashboard.");
 }
+}
+
+await ThemeChecks.Run(browser, url);

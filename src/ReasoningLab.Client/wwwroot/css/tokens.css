@@ -1,0 +1,103 @@
+@font-face {
+  font-family: Manrope;
+  src: url('../fonts/manrope.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Source Sans 3';
+  src: url('../fonts/source-sans-3.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+/* Theme values live here; component rules consume semantic tokens. */
+:root {
+  --canvas: #f5f7fc;
+  --surface: #fff;
+  --surface-subtle: #edf1f9;
+  --text: #172033;
+  --muted: #475569;
+  --border: #c8d0df;
+  --control: #64748b;
+  --primary: #4338ca;
+  --on-primary: #fff;
+  --selected: #eeedff;
+  --focus: #4338ca;
+  --success: #17613f;
+  --success-bg: #eaf6ee;
+  --success-border: #90b59e;
+  --review: #784809;
+  --review-bg: #fff3df;
+  --review-border: #b89968;
+  --shadow: 0 4px 18px #17203306;
+  color: var(--text);
+  background: var(--canvas);
+  color-scheme: light;
+  --error: #902f35; --error-bg: #fff0ef;
+}
+:root[data-theme='dark'] {
+  --canvas: #0f172a;
+  --surface: #172238;
+  --surface-subtle: #202e45;
+  --text: #e6edf7;
+  --muted: #b6c2d5;
+  --border: #35445e;
+  --control: #8a9bb5;
+  --primary: #a5b4fc;
+  --on-primary: #0f172a;
+  --selected: #28345a;
+  --focus: #c3cdff;
+  --success: #a1e2b9;
+  --success-bg: #18392e;
+  --success-border: #53826c;
+  --review: #f0cf99;
+  --review-bg: #3b3022;
+  --review-border: #a28760;
+  --shadow: none;
+  color-scheme: dark;
+  --error: #ffb4ba; --error-bg: #44252e;
+}
+:root[data-theme='warm'] {
+  --canvas: #f5f0e6;
+  --surface: #fffcf6;
+  --surface-subtle: #eee5d5;
+  --text: #2f2a24;
+  --muted: #625b50;
+  --border: #d6c9b7;
+  --control: #89785e;
+  --primary: #6b4f9e;
+  --on-primary: #fff;
+  --selected: #f0e9f5;
+  --focus: #6b4f9e;
+  --success: #355e3e;
+  --success-bg: #edf2e5;
+  --success-border: #9aaa8e;
+  --review: #754719;
+  --review-bg: #faedda;
+  --review-border: #b29974;
+  --shadow: 0 4px 18px #4b392407;
+  --error: #902f35; --error-bg: #fff0e8;
+}
+
+:root {
+  --font-heading: Manrope, 'Segoe UI', Arial, sans-serif;
+  --font-body: 'Source Sans 3', 'Segoe UI', Arial, sans-serif;
+  --text-small: .875rem;
+  --text-body: 1rem;
+  --text-reading: 1.125rem;
+  --ink: var(--text);
+  --line: var(--border);
+  --purple: var(--primary);
+  --green: var(--success);
+  --hero: #303c64;
+  --hero-text: #fff;
+  --hero-muted: #e0e5f4;
+  font-family: var(--font-body);
+  color: var(--text);
+  background: var(--canvas);
+  font-size: 16px;
+  font-synthesis: none;
+}
