@@ -10,6 +10,11 @@ await using var browser = await playwright.Chromium.LaunchAsync(new()
     ExecutablePath = Environment.GetEnvironmentVariable("BROWSER_EXECUTABLE")
 });
 Directory.CreateDirectory("artifacts");
+if (args.Contains("--updates-only"))
+{
+    await DeploymentChecks.Run(browser);
+    return;
+}
 if (args.Contains("--timeout-only"))
 {
     await RecoveryChecks.TimeoutRecovery(browser, url);

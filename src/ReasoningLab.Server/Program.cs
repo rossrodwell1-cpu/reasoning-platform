@@ -37,6 +37,17 @@ app.Use(async (context, next) =>
         if (origin.Length > 0 && origin != $"{context.Request.Scheme}://{context.Request.Host}")
         { context.Response.StatusCode = 403; return; }
     }
+    else if (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))
+    {
+        // Stable asset URLs are retained by the .NET 10 publish workaround.
+        // Revalidate all public responses, including fallback HTML and 304s.
+        // OnStarting runs after static-file middleware sets its own headers.
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers.CacheControl = "no-cache";
+            return Task.CompletedTask;
+        });
+    }
     try { await next(); }
     catch (RuleException ex)
     { context.Response.StatusCode = ex.Status; await context.Response.WriteAsJsonAsync(new { error = ex.Message }); }

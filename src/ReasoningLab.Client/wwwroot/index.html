@@ -19,7 +19,19 @@
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
-    <div id="app"><div class="boot"><strong>reasoninglab</strong><p>Making room for clearer thinking…</p></div></div>
-    <script src="_framework/blazor.webassembly.js"></script>
+    <div id="app">
+        <div class="boot">
+            <strong>reasoninglab</strong>
+            <p id="startup-status">Making room for clearer thinking…</p>
+            <section id="startup-error" hidden role="alert" aria-labelledby="startup-error-title">
+                <h1 id="startup-error-title" tabindex="-1">We couldn’t start ReasoningLab</h1>
+                <p>The connection may have been interrupted, or the application may have updated.</p>
+                <p>Check your connection, then reload to try again.</p>
+                <button id="startup-reload" type="button" class="button">Reload application</button>
+            </section>
+        </div>
+    </div>
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+    <script src="js/startup.js"></script>
 </body>
 </html>

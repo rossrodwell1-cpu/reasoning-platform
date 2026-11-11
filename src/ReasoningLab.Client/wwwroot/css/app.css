@@ -1045,8 +1045,12 @@ footer{
   place-content:center;
   min-height:100vh;
   text-align:center;
-  color:var(--muted)
+  color:var(--muted);
+  padding:1.5rem
 }
+
+.boot h1{font-size:1.5rem}
+.boot p{max-width:40rem}
 
 .boot strong{
   font-size:2rem
