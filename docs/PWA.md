@@ -148,11 +148,11 @@ The harness starts the published server DLLs in Production, switches them on the
 | Learner API cache policy | Passed: session/dashboard GETs and answer/session POSTs remained `no-store`. |
 | Already-open A practice and timed diagnostic against B | Passed: no navigation/reload, original selections retained, answers submitted successfully, persisted progress unchanged by cutover, original persisted deadline unchanged. |
 | Fresh B load with A's warm browser cache | Passed: rendered B HTML/CSS/JS markers and browser-fetched asset hashes matched the B publication, including compiled WASM; same learner cookie, two practice attempts and Warm Study preference retained. |
-| Full browser-process restart using the same profile | **Failed learner continuity**: the learner cookie disappeared before navigation, as did an independent persistent probe cookie. B loaded and the theme survived, but the app created a new learner with no attempts. The cookie had a future expiry before shutdown. This is broader than the deployment transition; its cause has not been established. |
+| Full browser-process restart using the same profile | **Failed learner continuity**: the learner cookie disappeared before navigation, as did an independent persistent probe cookie. B loaded and the theme survived, but the app created a new learner with no attempts. The cookie had a future expiry before shutdown. At this initial stage the cause was not established; the later sandbox investigation and successful normal-Windows verification are recorded below. |
 | Deliberate boot request spanning A → B | Reproduced integrity rejection of B's client WASM against A's boot metadata; a normal explicit reload then booted B successfully. This verifies recovery, not seamless startup across cutover. |
 | Service worker/application API cache | No service-worker registrations and no API URLs in Cache Storage in tested clients. Application source adds neither registration nor API caching. |
 
-The final `--updates-only` run exits nonzero for the browser-restart cookie failure; it is not an all-green suite. It completes the separate deployment-race check before reporting that failure. Do not treat fresh-page continuity as proof of browser/OS restart continuity. Earlier harness iterations corrected a timestamp comparison to use PostgreSQL-persisted precision and selected the correct second practice answer. One earlier browser-startup timeout was not reproduced in subsequent completed transition runs.
+The initial Codex sandbox `--updates-only` run exited nonzero for the browser-restart cookie failure; it was not an all-green suite. The harness completed the separate deployment-race check before reporting the sandbox failure. The later normal-Windows verification below passed. Do not treat fresh-page continuity as proof of browser/OS restart continuity. Earlier harness iterations corrected a timestamp comparison to use PostgreSQL-persisted precision and selected the correct second practice answer. One earlier browser-startup timeout was not reproduced in subsequent completed transition runs.
 
 These were **automated desktop Chrome tests of real published ASP.NET Core processes and real local PostgreSQL**, with simulated release markers and local process cutover. The race used an intentionally delayed browser request. No physical phones/tablets, installed PWA windows, Safari/Firefox, real reverse proxy/CDN, production HTTPS deployment or OS upgrade were tested. The Stage 1 installation matrix and Stage 2 fault-injection matrix were not repeated for this cache-policy change. Existing EF Core multiple-collection query warnings remain.
 
@@ -160,11 +160,11 @@ These were **automated desktop Chrome tests of real published ASP.NET Core proce
 
 1. Publish to a new release directory, verify it, then switch to the completed release. Do not copy files over a running publication. Keep the database and Data Protection keys outside release directories and preserve them during deployment/rollback; losing either breaks learner continuity. Keep APIs compatible with already-open clients. A/B here differ in assets/assembly metadata, not API contracts, so compatibility with future breaking changes is not demonstrated.
 2. Switching complete releases avoids partial-directory updates but is not atomic across a client's multiple boot requests. The follow-up below implements a startup-only “Reload application” action for a rejected boot. Eliminating the race altogether would need release-specific asset URLs with retained old assets or reliable release affinity, adding deployment complexity and potentially revisiting the fingerprinting workaround. That larger change is deferred.
-3. Verify cookie persistence on an ordinary target-browser profile and installed devices before claiming restart continuity. The automated environment lost both the learner and independent probe cookies; changing authentication or persisting identity elsewhere would be an unrelated workaround, so neither was added. Server-side progress was retained across A/B, but a missing identity cookie prevents the reopened client from accessing it.
+3. Cookie persistence across a genuine Chrome process restart has now passed in the user’s normal Windows environment, as recorded below. The earlier Codex sandbox lost both cookies because Windows user encryption was unavailable there; no authentication change or cookie-restoration workaround was added. Installed-device continuity still needs separate verification.
 4. Recheck all headers through the actual HTTPS proxy/CDN. Intermediaries must preserve public revalidation and must not cache API responses. New response headers cannot retroactively invalidate already-fresh responses cached before this policy existed; first rollout may require a manual reload/revalidation. The A/B fixtures both include the new policy.
 5. This policy trades some repeat-load performance for correctness at stable URLs. It does not guarantee offline launch, zero-downtime rollout, instant OS manifest/icon refresh, or safe mixing of incompatible API versions. No service worker, background synchronisation, offline attempt queue or storage-clearing update mechanism is introduced.
 
-Stage 3 implementation is approved for a local commit on `feat/pwa-foundation`. Browser-restart persistence remains an outstanding verification requirement. No push, merge or pull request is authorised.
+Stage 3 implementation was committed locally on `feat/pwa-foundation` as `c28bc7f4d615c79a8d223b6c3de508201e929a78`. The normal-Windows browser-restart verification is now satisfied. No push, merge or pull request is authorised.
 
 ### Stage 3 follow-up — 11 November 2026
 
@@ -182,7 +182,7 @@ $probe = [System.Security.Cryptography.ProtectedData]::Protect(
     [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
 ```
 
-Restart continuity must still be rerun under a normal Windows user with working DPAPI. A passing fresh-page test is not a substitute. Do not work around this by disabling browser encryption, changing the production cookie, or restoring cookie values from test memory.
+At this stage of the sandbox investigation, restart continuity still required a normal-Windows rerun. That independent rerun has since passed, as recorded below. A passing fresh-page test alone is not a substitute. Do not work around this by disabling browser encryption, changing the production cookie, or restoring cookie values from test memory.
 
 **Startup-only recovery.** `index.html` disables Blazor autostart and loads `js/startup.js`, which awaits `Blazor.start()`. The published .NET 10 integrity-failure test demonstrated that a failed boot download can emit unhandled promise rejections without settling that outer promise. Catching `Blazor.start()` alone failed this test. The final implementation also installs a temporary `unhandledrejection` listener during startup; it removes itself on successful startup or the first failure. It does not suppress browser error logging.
 
@@ -190,12 +190,12 @@ If startup fails while the boot markup is still present, recovery reveals a labe
 
 The recovery message deliberately does not claim that every startup failure is an update: interrupted downloads can also reject startup. It cannot handle failures before the recovery script is downloaded, JavaScript being disabled, an offline cold launch, or a request that never settles. It does not make the multi-request deployment boundary atomic. The .NET 10 asset workarounds, API cache policy, Data Protection configuration and learning rules remain unchanged.
 
-**Final focused results.** Solution and browser-test builds passed with zero warnings/errors; the startup script passed the JavaScript syntax check. Both final Release fixtures published successfully under `artifacts/update-recovery-final`. The final published-browser results were:
+**Final Codex sandbox focused results.** Solution and browser-test builds passed with zero warnings/errors; the startup script passed the JavaScript syntax check. Both final Release fixtures published successfully under `artifacts/update-recovery-final`. The final published-browser results were:
 
 - A/B cache headers, conditional requests and asset hashes, now including `js/startup.js`.
 - Already-open practice and diagnostic clients: no forced navigation, preserved selections, successful submissions and unchanged server deadline.
 - Fresh B page with warm caches: updated assets, same learner identity, persisted progress and theme.
-- Full process restart: the original PID was confirmed exited and a different PID opened the same profile; B and the theme loaded correctly. **Cookie continuity failed**: both cookies were absent before navigation and the learner was recreated. No cookie restoration or weaker encryption was used. This remains the sole final suite failure and produces a nonzero exit.
+- Full process restart: the original PID was confirmed exited and a different PID opened the same profile; B and the theme loaded correctly. **Cookie continuity failed**: both cookies were absent before navigation and the learner was recreated. No cookie restoration or weaker encryption was used. This was the sole final sandbox suite failure and produced a nonzero exit; the later normal-Windows rerun passed this check.
 - Simulated boot/cutover race: integrity rejected the mismatched WASM; the labelled recovery alert appeared and its heading received focus. At 390×844 there was no horizontal overflow; the screenshot was visually inspected. No navigation occurred before user action. Tab reached the reload button, Enter activated it, and the application booted B successfully with matching assets and the recovery markup removed.
 - No service-worker registration or API responses in Cache Storage.
 
@@ -208,9 +208,24 @@ $env:UPDATE_RELEASE_ROOT = 'artifacts/update-recovery-final'
 dotnet run --project tests/ReasoningLab.BrowserTests --no-build -- --updates-only
 ```
 
-`artifacts/update-recovery-final-run.log`, `artifacts/update-startup-recovery.png` and the isolated `artifacts/cookie-probe.log` contain local evidence; artifacts are intentionally not versioned. For a new checkout, publish fresh fixtures using the script and set `UPDATE_RELEASE_ROOT` accordingly. Re-run under a Windows account with working DPAPI before marking cookie restart acceptance complete. Physical-device/installed-PWA testing, screen-reader verification, other browser engines and production HTTPS/proxy/CDN verification remain outstanding. Only a local Stage 3 commit is approved; no push, merge or pull request is authorised.
+`artifacts/update-recovery-final-run.log`, `artifacts/update-startup-recovery.png` and the isolated `artifacts/cookie-probe.log` contain local evidence; artifacts are intentionally not versioned. For a new checkout, publish fresh fixtures using the script and set `UPDATE_RELEASE_ROOT` accordingly. Cookie restart acceptance was subsequently completed by the user’s independent normal-Windows run below. Physical-device/installed-PWA testing, screen-reader verification, other browser engines and production HTTPS/proxy/CDN verification remain outstanding. Only a local Stage 3 commit is approved; no push, merge or pull request is authorised.
 
-### Outstanding restart verification: normal Windows PowerShell
+### Independent normal-Windows verification — passed
+
+The user ran the documented published-application checks from normal Windows PowerShell, outside the Codex sandbox, and supplied the passing output and confirmation of successful completion. This is user-executed verification, not another Codex sandbox run. The output confirmed:
+
+- The original Chrome process (PID 45964) exited and a new process (PID 51736) reopened the persistent profile.
+- Before navigation, both `learner cookie retained=True` and `independent persistent probe retained=True` were reported.
+- Learner identity was retained and both recorded attempts remained available (`identity retained: True; attempts: 2`).
+- Release B and the theme survived the restart.
+- A → B revalidation, compiled assets, no-store API responses, active selections, successful submissions and fixed diagnostic deadlines passed.
+- The simulated deployment-startup integrity failure showed accessible recovery, and keyboard reload successfully booted B.
+
+This satisfies the outstanding normal-Windows browser-restart requirement and supports the diagnosis that the earlier cookie loss was specific to the Codex sandbox’s unavailable Windows DPAPI context. The sandbox configuration itself has not been repaired. The test remains enabled; no production identity changes, cookie restoration or weaker browser security settings were needed. Exact Windows and Chrome version numbers were not included in the supplied results.
+
+Physical-device installation and installed-PWA continuity, other browser engines, screen-reader verification, and production HTTPS/reverse-proxy/CDN deployment checks remain outstanding. The deployment race remains recoverable rather than eliminated, and offline cold launch remains unsupported. This documentation update does not change application code or rerun the suite.
+
+### Repeating restart verification: normal Windows PowerShell
 
 Open PowerShell yourself from the Windows Start menu, under your normal Windows account, outside the Codex sandbox. The following commands use this task's existing compiled browser tests and final A/B publications; they do not touch the separate VS Code checkout. Prerequisites: .NET 10, Chrome at the shown path, the existing migrated/seeded local test PostgreSQL instance running on port 55432, and port 5197 free. The database below is the local development test database, not a production connection. The harness creates new test learners and starts/stops its own published server processes.
 
@@ -234,7 +249,7 @@ if ($LASTEXITCODE -ne 0) { throw "Published update/restart verification failed (
 
 The Windows identity should be your normal account, not `CodexSandboxOnline`. Stop if the DPAPI probe fails; no browser security or production identity change is an acceptable workaround. The cookie check stays enabled inside `--updates-only` (there is no separate cookie-only switch). Do not delete or replace `artifacts/update-keys` between releases or browser launches. The same key directory and database are used throughout the test.
 
-Acceptance still requires all of the following in the normal-account run: the old browser PID exits; a new PID opens the same profile; **both** `learner cookie retained=True` and `independent persistent probe retained=True` are reported **before navigation**; the reopened app reports `identity retained: True; attempts: 2`; the Warm Study theme survives; and the full command exits 0. Record that run's browser/Windows versions and output before closing the outstanding requirement. A successful DPAPI probe alone does not prove cookie persistence. Any failed assertion must remain visible, even if the other deployment checks pass.
+For future runs, the acceptance criteria remain: the old browser PID exits; a new PID opens the same profile; **both** `learner cookie retained=True` and `independent persistent probe retained=True` are reported **before navigation**; the reopened app reports `identity retained: True; attempts: 2`; the Warm Study theme survives; and the full command exits 0. Record the browser/Windows versions and output when repeating the check. A successful DPAPI probe alone does not prove cookie persistence. Any failed assertion must remain visible, even if the other deployment checks pass.
 
 If reproducing from a checkout without generated artifacts, first restore/build and publish fresh fixtures from that checkout's root (using your configured migrated/seeded test database), then run the same `--updates-only` command:
 
